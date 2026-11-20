@@ -1,0 +1,10 @@
+# Test F. Copy into an onboarded app's manifests folder on a throwaway branch, then run deploy.
+# It asks to create a ConfigMap in ANOTHER app's namespace. Expected: kubectl refuses
+# (namespace mismatch with --namespace) and/or RBAC denies it; nothing lands in the other namespace.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: escape-attempt
+  namespace: ssop-container
+data:
+  note: "If this exists in ssop-container, namespace isolation failed."

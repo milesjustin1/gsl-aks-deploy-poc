@@ -1,0 +1,18 @@
+# Optional test URL through the cluster's application routing add-on (if enabled on your cluster).
+# Rename to ingress.yaml to deploy it. Add a tls: section with a Key Vault certificate before any real use.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: __APP__
+spec:
+  ingressClassName: webapprouting.kubernetes.azure.com
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: __APP__
+                port:
+                  number: 80

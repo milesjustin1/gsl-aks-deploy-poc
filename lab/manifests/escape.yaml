@@ -1,0 +1,8 @@
+# Test F (lab). Pushed to a throwaway branch of obs-ingest; asks to write into hello-web's namespace.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: escape-attempt
+  namespace: hello-web
+data:
+  note: "If this exists in hello-web, namespace isolation failed."
