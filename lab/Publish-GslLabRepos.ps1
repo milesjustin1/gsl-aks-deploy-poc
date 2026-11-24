@@ -52,7 +52,7 @@ foreach ($v in @("GH_TOKEN", "GITHUB_TOKEN")) {
     }
 }
 # Ask GitHub which scopes the token gh is actually using (classic OAuth tokens report X-OAuth-Scopes).
-$scopeLine = @(& gh api -i user 2>$null | Select-String -Pattern '^X-OAuth-Scopes:\s*(.*)$') | Select-Object -First 1
+$scopeLine = @(& { $ErrorActionPreference = 'Continue'; & gh api -i user 2>$null } | Select-String -Pattern '^X-OAuth-Scopes:\s*(.*)$') | Select-Object -First 1
 if ($scopeLine) {
     $scopes = $scopeLine.Matches[0].Groups[1].Value.Trim()
     if ($scopes -notmatch '(^|[\s,])workflow($|[\s,])') {
@@ -63,7 +63,7 @@ if ($scopeLine) {
 else {
     Write-Warning "Could not read token scopes (fine-grained token?). Continuing. Pushing workflow files needs Contents + Workflows write; creating repos needs Administration write."
 }
-& gh auth setup-git 2>$null | Out-Null
+& { $ErrorActionPreference = 'Continue'; & gh auth setup-git 2>$null } | Out-Null
 $ident = Get-GitIdentity
 $ownerType = (Invoke-Gh api "users/$owner" --jq .type).Trim()
 Write-Ok "Pushing as $($ident.Name); owner $owner is a GitHub $ownerType; repos will be $Visibility"
@@ -114,7 +114,7 @@ Start-Sleep -Seconds $RbacWaitSeconds
 Write-Step "Push app code; each push to main triggers a deployment"
 $pushed = @{}
 foreach ($app in $Apps) {
-    if (-not $RefreshCode -and (& git ls-remote --heads "https://github.com/$owner/$app.git" 2>$null)) {
+    if (-not $RefreshCode -and (& { $ErrorActionPreference = 'Continue'; & git ls-remote --heads "https://github.com/$owner/$app.git" 2>$null })) {
         Write-Info "$app already has code; not pushed again (use -RefreshCode to overwrite)"
         continue
     }
@@ -146,8 +146,8 @@ foreach ($app in $Apps) {
 $results | Format-Table -AutoSize
 
 Write-Step "What is running"
-foreach ($app in $Apps) { & kubectl get deploy,pods -n $app -o wide 2>$null }
-$ip = (& kubectl get svc nginx -n app-routing-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null)
+foreach ($app in $Apps) { & { $ErrorActionPreference = 'Continue'; & kubectl get deploy,pods -n $app -o wide 2>$null } }
+$ip = (& { $ErrorActionPreference = 'Continue'; & kubectl get svc nginx -n app-routing-system -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>$null })
 if ($ip) {
     Write-Host "`n  Try the apps through the app routing ingress:" -ForegroundColor Cyan
     foreach ($app in $Apps) { Write-Host "    curl -H `"Host: $app.gsl-lab.local`" http://$ip/" }

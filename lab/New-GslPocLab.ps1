@@ -113,7 +113,7 @@ Invoke-Az aks get-credentials -g $ResourceGroup -n $AksName --overwrite-existing
 & kubelogin convert-kubeconfig -l azurecli | Out-Null
 $ok = $false
 for ($i = 1; $i -le 20 -and -not $ok; $i++) {
-    & kubectl get namespaces --request-timeout=20s *> $null
+    & { $ErrorActionPreference = 'Continue'; & kubectl get namespaces --request-timeout=20s *> $null }
     if ($LASTEXITCODE -eq 0) { $ok = $true } else { Write-Info "Waiting for Azure RBAC to apply ($i/20)..."; Start-Sleep -Seconds 30 }
 }
 if (-not $ok) { throw "kubectl still cannot list namespaces. Check 'az login' and the role assignment, then re-run." }

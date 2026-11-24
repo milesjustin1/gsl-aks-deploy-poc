@@ -105,12 +105,12 @@ $t0 = (Get-Date).ToUniversalTime().AddSeconds(-10)
 Start-GhWorkflow -Full $fRepo -Workflow "deploy.yml" -Ref "escape-test"
 $r = Wait-GhRun -Full $fRepo -Workflow "deploy.yml" -After $t0
 $why = Get-RunFailureLine -Full $fRepo -RunId $r.Id
-& kubectl get configmap escape-attempt -n hello-web *> $null
+& { $ErrorActionPreference = 'Continue'; & kubectl get configmap escape-attempt -n hello-web *> $null }
 $absent = ($LASTEXITCODE -ne 0)
 # Only counts if the run failed BECAUSE of the cross-namespace object, not for some unrelated reason.
 $nsDenied = $why -match "namespace|forbidden|cannot (create|patch|get)"
 Add-TestResult "F. Cross-namespace write" "Apply fails on the hello-web object; nothing in hello-web" $r (($r.Conclusion -eq "failure") -and $absent -and $nsDenied) "run $($r.Conclusion); configmap in hello-web: $(if ($absent) {'absent'} else {'PRESENT'}); error: $why"
-& gh api -X DELETE "repos/$fRepo/git/refs/heads/escape-test" 2>$null | Out-Null
+& { $ErrorActionPreference = 'Continue'; & gh api -X DELETE "repos/$fRepo/git/refs/heads/escape-test" 2>$null } | Out-Null
 
 # ------------------------------------------------------------------ Invariants
 Write-Step "Invariants after all tests"

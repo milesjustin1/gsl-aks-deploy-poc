@@ -8,7 +8,7 @@ function Write-Info { param([string]$Text) Write-Host "    $Text" -ForegroundCol
 
 function Invoke-Az {
     param([Parameter(ValueFromRemainingArguments)][string[]]$AzArgs)
-    $out = & az @AzArgs -o json 2>&1
+    $out = & { $ErrorActionPreference = 'Continue'; & az @AzArgs -o json 2>&1 }
     if ($LASTEXITCODE -ne 0) { throw "az $($AzArgs[0..([Math]::Min(3, $AzArgs.Count - 1))] -join ' ') failed: $((($out | Out-String).Trim()) -replace '\s+', ' ')" }
     $text = ($out | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join "`n"
     if ([string]::IsNullOrWhiteSpace($text)) { return $null }
@@ -17,14 +17,14 @@ function Invoke-Az {
 
 function Invoke-Gh {
     param([Parameter(ValueFromRemainingArguments)][string[]]$GhArgs)
-    $out = & gh @GhArgs 2>&1
+    $out = & { $ErrorActionPreference = 'Continue'; & gh @GhArgs 2>&1 }
     if ($LASTEXITCODE -ne 0) { throw "gh $($GhArgs -join ' ') failed: $((($out | Out-String).Trim()) -replace '\s+', ' ')" }
     return (($out | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join "`n")
 }
 
 function Invoke-Git {
     param([string]$Dir, [Parameter(ValueFromRemainingArguments)][string[]]$GitArgs)
-    $out = & git -C $Dir @GitArgs 2>&1
+    $out = & { $ErrorActionPreference = 'Continue'; & git -C $Dir @GitArgs 2>&1 }
     if ($LASTEXITCODE -ne 0) { throw "git $($GitArgs -join ' ') failed: $((($out | Out-String).Trim()) -replace '\s+', ' ')" }
     return (($out | ForEach-Object { "$_" }) -join "`n")
 }
@@ -53,7 +53,7 @@ function Get-GitIdentity {
 
 function Test-GhRepo {
     param([string]$Full)
-    & gh repo view $Full --json name 2>$null | Out-Null
+    & { $ErrorActionPreference = 'Continue'; & gh repo view $Full --json name 2>$null } | Out-Null
     return ($LASTEXITCODE -eq 0)
 }
 
@@ -76,7 +76,7 @@ function Get-RepoWorkingCopy {
     param([string]$Full)
     $dir = New-TempDir
     $remote = "https://github.com/$Full.git"
-    $heads = & git ls-remote --heads $remote 2>$null
+    $heads = & { $ErrorActionPreference = 'Continue'; & git ls-remote --heads $remote 2>$null }
     if ($heads) { Invoke-Git $dir clone --quiet $remote . | Out-Null }
     else {
         Invoke-Git $dir init --quiet | Out-Null
@@ -109,14 +109,14 @@ function Wait-GhRun {
     $run = $null
     while (-not $run -and (Get-Date) -lt $deadline) {
         Start-Sleep -Seconds 6
-        $list = & gh run list -R $Full --workflow $Workflow --limit 10 --json databaseId,createdAt,url 2>$null | ConvertFrom-Json
+        $list = & { $ErrorActionPreference = 'Continue'; & gh run list -R $Full --workflow $Workflow --limit 10 --json databaseId,createdAt,url 2>$null } | ConvertFrom-Json
         $run = @($list) | Where-Object { ([datetime]$_.createdAt).ToUniversalTime() -gt $After } | Sort-Object createdAt | Select-Object -First 1
     }
     if (-not $run) { throw "No run of $Workflow appeared in $Full" }
     Write-Info "Run started: $($run.url)"
     $last = ""
     while ((Get-Date) -lt $deadline) {
-        $v = & gh run view $run.databaseId -R $Full --json status,conclusion,jobs 2>$null | ConvertFrom-Json
+        $v = & { $ErrorActionPreference = 'Continue'; & gh run view $run.databaseId -R $Full --json status,conclusion,jobs 2>$null } | ConvertFrom-Json
         $step = @($v.jobs | ForEach-Object { $_.steps } | Where-Object { $_.status -eq "in_progress" } | Select-Object -First 1).name
         $line = "$($v.status)$(if ($step) { ': ' + $step })"
         if ($line -ne $last) { Write-Info "  $line"; $last = $line }
@@ -132,7 +132,7 @@ function Get-RunFailureLine {
     # Returns the real error from a run's log. Uses ##[error] lines only: the log also echoes each step's
     # script source, so a plain text search would match error messages that were never printed.
     param([string]$Full, [long]$RunId, [switch]$AllLogs)
-    $log = if ($AllLogs) { & gh run view $RunId -R $Full --log 2>$null } else { & gh run view $RunId -R $Full --log-failed 2>$null }
+    $log = if ($AllLogs) { & { $ErrorActionPreference = 'Continue'; & gh run view $RunId -R $Full --log 2>$null } } else { & { $ErrorActionPreference = 'Continue'; & gh run view $RunId -R $Full --log-failed 2>$null } }
     $errs = @($log | Select-String -Pattern '##\[error\](.*)$' | ForEach-Object { $_.Matches[0].Groups[1].Value.Trim() } |
         Where-Object { $_ -and $_ -notmatch '^Process completed with exit code' })
     $aad = @($errs | Where-Object { $_ -match 'AADSTS\d+' }) | Select-Object -First 1
@@ -149,7 +149,7 @@ function Start-GhWorkflow {
     for ($i = 1; $i -le 12; $i++) {
         $a = @("workflow", "run", $Workflow, "-R", $Full)
         if ($Ref) { $a += @("--ref", $Ref) }
-        & gh @a 2>$null | Out-Null
+        & { $ErrorActionPreference = 'Continue'; & gh @a 2>$null } | Out-Null
         if ($LASTEXITCODE -eq 0) { return }
         Start-Sleep -Seconds 5
     }
@@ -158,7 +158,7 @@ function Start-GhWorkflow {
 
 function Get-OwnedAppCount {
     # No JMESPath here on purpose: on Windows az is az.cmd, and cmd.exe mangles arguments such as length(@).
-    $out = & az ad app list --show-mine -o json 2>$null
+    $out = & { $ErrorActionPreference = 'Continue'; & az ad app list --show-mine -o json 2>$null }
     if ($LASTEXITCODE -ne 0) { throw "az ad app list --show-mine failed (are you signed in with az login?)" }
     $j = ($out -join "`n") | ConvertFrom-Json
     if ($null -eq $j) { return 0 }

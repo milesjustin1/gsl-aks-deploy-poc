@@ -21,7 +21,7 @@ $ErrorActionPreference = "Stop"
 
 function Invoke-Az {
     param([Parameter(ValueFromRemainingArguments)][string[]]$AzArgs)
-    $out = & az @AzArgs -o json 2>&1
+    $out = & { $ErrorActionPreference = 'Continue'; & az @AzArgs -o json 2>&1 }
     if ($LASTEXITCODE -ne 0) { throw "az $($AzArgs -join ' ') failed: $(($out | Out-String).Trim())" }
     $text = ($out | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join "`n"
     if ([string]::IsNullOrWhiteSpace($text)) { return $null }

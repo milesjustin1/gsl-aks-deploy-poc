@@ -44,7 +44,7 @@ $ErrorActionPreference = "Stop"
 
 function Invoke-Az {
     param([Parameter(ValueFromRemainingArguments)][string[]]$AzArgs)
-    $out = & az @AzArgs -o json 2>&1
+    $out = & { $ErrorActionPreference = 'Continue'; & az @AzArgs -o json 2>&1 }
     if ($LASTEXITCODE -ne 0) { throw "az $($AzArgs -join ' ') failed: $(($out | Out-String).Trim())" }
     $text = ($out | Where-Object { $_ -isnot [System.Management.Automation.ErrorRecord] }) -join "`n"
     if ([string]::IsNullOrWhiteSpace($text)) { return $null }
@@ -161,7 +161,7 @@ if (-not $SkipGitHub) {
     $full = "$($s.gitHubOrg)/$AppRepo"
 
     Write-Step "GitHub OIDC subject for $full"
-    $current = & gh api "repos/$full/actions/oidc/customization/sub" 2>$null | ConvertFrom-Json
+    $current = & { $ErrorActionPreference = 'Continue'; & gh api "repos/$full/actions/oidc/customization/sub" 2>$null } | ConvertFrom-Json
     Write-Host "  Before: use_default=$($current.use_default) keys=$(@($current.include_claim_keys) -join ',')"
     if ($PSCmdlet.ShouldProcess($full, "Set OIDC subject to repository_owner_id + job_workflow_ref")) {
         '{"use_default":false,"include_claim_keys":["repository_owner_id","job_workflow_ref"]}' |

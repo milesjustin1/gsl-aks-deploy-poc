@@ -20,7 +20,7 @@ if ($PSCmdlet.ShouldProcess($s.resourceGroup, "Delete resource group and everyth
     Invoke-Az group delete -n $s.resourceGroup --yes --no-wait | Out-Null
     Write-Ok "Deleting $($s.resourceGroup) (runs in the background, ~10 minutes)"
 }
-& kubectl config delete-context $s.aksName 2>$null | Out-Null
+& { $ErrorActionPreference = 'Continue'; & kubectl config delete-context $s.aksName 2>$null } | Out-Null
 
 if ($DeleteRepos) {
     foreach ($r in $Repos) {
